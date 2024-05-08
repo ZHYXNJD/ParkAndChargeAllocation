@@ -1,9 +1,15 @@
 """
 分配时用到的一些工具
 """
+import os
+from datetime import datetime
+
 import numpy as np
 
-from entity.parkinglot import Parkinglot
+from entity import parkinglot
+
+pl1, pl2, pl3, pl4 = parkinglot.get_parking_lot(parking_lot_num=4)
+pl = [pl1, pl2, pl3, pl4]
 
 
 def get_rmk(req_info):
@@ -30,14 +36,16 @@ def get_rmk_(req_info):
 def T_ZN(Z, N, pl):
     t_zn = np.zeros((Z, N)).astype(dtype=np.int8)
     all_index = []
+    each_index = []
     index = [0]
     temp_index = 0
     for i in range(Z):
         temp_index += pl[i].total_num
         index.append(temp_index)
         t_zn[i, index[i]:index[i + 1]] = 1
-        all_index.extend(range(index[i],index[i+1]))
-    return t_zn,all_index
+        all_index.extend(range(index[i], index[i + 1]))
+        each_index.append(list(range(index[i], index[i + 1])))
+    return t_zn, all_index, each_index
 
 
 # 普通泊位分布
@@ -106,10 +114,35 @@ def Slow_ZN(Z, N, pl):
     return slow_zn, slow_index
 
 
+def cruise_t(z, snk, index, arrival_t):
+    occ_rate = np.sum(snk[index, arrival_t], axis=0) / pl[z].total_num
+    return 4.467 * np.power(occ_rate, 18.86)
+
+
+def save_reinforcement(result_list, rule):
+    # 保存数据
+    try:
+        os.makedirs('../save_data_reinforce')
+    except:
+        pass
+
+    folder_name = str(datetime.now().strftime("%m-%d-%H-%M"))
+    save_path = '../save_data_reinforce/' + folder_name
+    os.makedirs(save_path)
+    # 打开文件进行写入
+    result = result_list[:-1]
+    supply_pl = result_list[-1]
+    with open(save_path+'/reinforce_{}.txt'.format(rule), 'w') as file:
+        # 遍历列表，写入每个元素到文件
+        for item in result:
+            file.write(str(item) + '\n')  # 添加换行符以确保列表中的每个项目都在新的一行
+    np.save(save_path + '/supply_pl.npy', supply_pl)
+
+
 def test():
-    pl1 = Parkinglot(id=1, total_num=40, charge_num=10, slow_charge_num=3)
-    pl2 = Parkinglot(id=2, total_num=20, charge_num=5, slow_charge_num=1)
-    pl3 = Parkinglot(id=3, total_num=10, charge_num=2, slow_charge_num=1)
+    pl1 = parkinglot.Parkinglot(id=1, total_num=40, charge_num=10, slow_charge_num=3)
+    pl2 = parkinglot.Parkinglot(id=2, total_num=20, charge_num=5, slow_charge_num=1)
+    pl3 = parkinglot.Parkinglot(id=3, total_num=10, charge_num=2, slow_charge_num=1)
 
     pzn, ops_index = C_ZN(3, 70, [pl1, pl2, pl3])
 

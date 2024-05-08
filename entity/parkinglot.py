@@ -1,5 +1,5 @@
 class Parkinglot:
-    def __init__(self, id, total_num, charge_num, slow_charge_num, park_fee=3, charge_fee=1.5,
+    def __init__(self, id, total_num, charge_num, slow_charge_num, park_fee=3, fast_charge_fee=0.7, slow_charge_fee=0.5,
                  reserve_fee=1):  # 初始化一个停车场，需要定义停车场编号，泊位数量，充电桩比例
         self.id = id
         self.total_num = total_num
@@ -8,7 +8,8 @@ class Parkinglot:
         self.slow_charge_space = slow_charge_num
         self.fast_charge_space = charge_num - slow_charge_num
         self.park_fee = park_fee
-        self.charge_fee = charge_fee
+        self.fast_charge_fee = fast_charge_fee
+        self.slow_charge_fee = slow_charge_fee
         self.reserve_fee = reserve_fee
 
 

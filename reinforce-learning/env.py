@@ -1,7 +1,6 @@
 """
 强化学习环境搭建
 """
-import os
 import numpy as np
 import pandas as pd
 from entity import parkinglot, OD, demand
@@ -17,18 +16,25 @@ fast_charge_num = [pl1.fast_charge_space, pl2.fast_charge_space, pl3.fast_charge
 slow_charge_num = [pl1.slow_charge_space, pl2.slow_charge_space, pl3.slow_charge_space, pl4.slow_charge_space, ]
 
 
-def get_train_req():
-    # 更新需求
-    req_info = demand.main(park_arrival_num=100, charge_ratio=0.1)
-    # 计算收益
-    req_info['revenue'] = [(req_info['activity_t'].iloc[i] * (
-            pl1.park_fee / 60 + pl1.charge_fee * req_info['label'].iloc[i]) + pl1.reserve_fee) for i in
+def get_revenue(req_info):
+    park_fee = pl1.park_fee / 2  # 半个小时的费用
+    charge_fee = [0, pl1.fast_charge_fee, pl1.slow_charge_fee]  # 每分钟的价格
+    reserved_fee = pl1.reserve_fee  # 预约费用
+    req_info['revenue'] = [(np.floor(req_info['activity_t'].iloc[i] / 15) * park_fee + (
+            req_info['activity_t'].iloc[i] * (charge_fee[req_info['new_label'].iloc[i]])) + reserved_fee) for i in
                            range(len(req_info))]
     return req_info
 
 
-os.chdir(r'G:\2023-纵向\停车分配')
-evaluate_req_info = pd.read_csv("reinforce-learning/new_req_info.csv")
+def get_train_req():
+    # 更新需求
+    req_info = demand.main(park_arrival_num=500, charge_ratio=0.2)
+    return get_revenue(req_info)
+
+
+def get_eval_req():
+    evaluate_req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand data\500-0.2.csv")
+    return get_revenue(evaluate_req_info)
 
 
 class ParkingLotManagement:
@@ -66,14 +72,17 @@ class ParkingLotManagement:
                     self.av_scps += 1
 
     def update_cruising_t(self):
-        self.cruising_t = 15 * (1 - (self.av_fcps + self.av_ops + self.av_scps) / self.total_num)
+        # self.cruising_t = 15 * (1 - (self.av_fcps + self.av_ops + self.av_scps) / self.total_num)
+        occ_rate = 1 - (self.av_ops + self.av_scps + self.av_fcps) / self.total_num
+        self.cruising_t = 4.467 * np.power(occ_rate, 18.86)
 
 
 # plm = [ParkingLotManagement(i) for i in range(pl_num)]
 
 
 class Env:
-    def __init__(self,evaluate=False):
+    def __init__(self, evaluate=False):
+        self.supply_t = []
         self.accumulative_rewards = None
         self.plm = None
         self.evaluate = evaluate
@@ -116,7 +125,7 @@ class Env:
         if not self.evaluate:
             self.req_info = get_train_req()
         else:
-            self.req_info = evaluate_req_info
+            self.req_info = get_eval_req()
         # 初始化plm
         self.plm = [ParkingLotManagement(i, self.req_info) for i in range(pl_num)]
         # 当前时刻
@@ -150,6 +159,7 @@ class Env:
         self.total_refuse = 0  # 拒绝数量
         self.park_refuse = 0  # 停车拒绝
         self.char_refuse = 0  # 充电拒绝
+        self.supply_t = []  # 每个时间内的可用泊位数(step之后 把pl_current_supply添加进去即可) 可以获得占有率变化 这个只需要在评估的时候记录即可
 
         self.termination = False  # 终止态
         self.done = False  # 结束态
@@ -224,7 +234,8 @@ class Env:
 
     # 停车或充电需求，包括需求种类，起终点编号（独热编码），活动时长
     def get_request_demand(self):
-        result = self.req_info[['new_label', 'O', 'D', 'activity_t', 'req_id']].loc[self.req_info['arrival_t'] == self.t].values
+        result = self.req_info[['new_label', 'O', 'D', 'activity_t', 'req_id']].loc[
+            self.req_info['arrival_t'] == self.t].values
         if len(result) == 0:
             self.req_id_at_t = 0  # 不能使用
             return np.zeros((1, 4)).astype(int)
@@ -306,7 +317,7 @@ class Env:
                 if demand.any() == 0:
                     self.rewards = 0
                 else:
-                    self.rewards = -100
+                    self.rewards = -10
                     self.total_refuse += 1
                     if req_type == 0:
                         self.park_refuse += 1
@@ -315,9 +326,32 @@ class Env:
 
             # print(f"时刻:{self.t}")
             # print(f"泊位状态:{self.current_supply()}")
+            self.supply_t.append(self.pl_current_supply)
             self.accumulative_rewards += self.rewards
-            return self.states, self.rewards, self.termination, self.total_revenue, self.travel_cost, self.cruise_cost
+            if self.evaluate:
+                return self.states, self.rewards, self.termination, [self.total_revenue, self.park_revenue,
+                                                                     self.char_revenue, self.total_refuse,
+                                                                     self.park_refuse, self.char_refuse,
+                                                                     self.travel_cost, self.cruise_cost, self.supply_t]
+            else:
+                return self.states, self.rewards, self.termination
+
         else:
+            self.supply_t.append(self.pl_current_supply)
             self.termination = True
             self.accumulative_rewards += self.rewards
-            return self.states, self.rewards, self.termination, self.total_revenue, self.travel_cost, self.cruise_cost
+            if self.evaluate:
+                return self.states, self.rewards, self.termination, [self.total_revenue, self.park_revenue,
+                                                                     self.char_revenue, self.total_refuse,
+                                                                     self.park_refuse, self.char_refuse,
+                                                                     self.travel_cost, self.cruise_cost, self.supply_t]
+            else:
+                return self.states, self.rewards, self.termination
+
+
+def test():
+    train_req_info = get_train_req()
+    print("11")
+
+
+test()

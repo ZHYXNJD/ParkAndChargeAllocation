@@ -149,7 +149,7 @@ class PPO_discrete:
                 self.optimizer_actor.zero_grad()
                 actor_loss.mean().backward()
                 if self.use_grad_clip:  # Trick 7: Gradient clip
-                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
+                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.2)
                 self.optimizer_actor.step()
 
                 v_s = self.critic(s[index])
@@ -162,7 +162,7 @@ class PPO_discrete:
                 self.optimizer_critic.zero_grad()
                 critic_loss.backward()
                 if self.use_grad_clip:  # Trick 7: Gradient clip
-                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
+                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.2)
                 self.optimizer_critic.step()
 
         if self.use_lr_decay:  # Trick 6:learning rate Decay

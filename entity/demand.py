@@ -9,11 +9,10 @@ from entity import OD
 
 matplotlib.use('TkAgg')
 
-
 # 确保可以复现
 
 # 评估的时候打开随机种子  训练的时候关闭掉
-# np.random.seed(1000)
+np.random.seed(1000)
 
 
 def truncated_gaussian(mean, std):
@@ -60,16 +59,18 @@ def sum_to_total(init_arrival, total_arrival):
 class Demand:
 
     def __init__(self, park_arrival_num, charge_ratio):
-        self.fast_std = 10
-        self.fast_mean = 40
-        self.slow_std = 300
-        self.slow_mean = 60
-        self.m_std = 30
-        self.m_mean = 120
+        self.fast_std = 25
+        self.fast_mean = 45
+        self.slow_std = 280
+        self.slow_mean = 100
+        self.m_std = 85
+        self.m_mean = 350
         self.l_std = 120
-        self.l_mean = 480
-        self.s_std = 5
-        self.s_mean = 20
+        self.l_mean = 650
+        self.s_std = 60
+        self.s_mean = 80
+        self.el_std = 140
+        self.el_mean = 1250
         self.park_num = park_arrival_num
         self.charge_num = self.park_num * charge_ratio
 
@@ -126,20 +127,35 @@ class Demand:
         elif park_type == 'm':
             a = truncated_gaussian(self.m_mean, self.m_std)
             return a
-        else:
+        elif park_type == 'l':
             a = truncated_gaussian(self.l_mean, self.l_std)
+            return a
+        else:
+            a = truncated_gaussian(self.el_mean, self.el_std)
             return a
 
     def park_duration_dis(self, arrival_times_hours):  # 返回停车时长的分布
         park_duration = []
         choice_ratio = ShortLongParkRatio().choice_ratio
         for each in arrival_times_hours:
-            if each <= 9:
-                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l'], p=choice_ratio[0]))
-            elif 9 < each <= 18:
-                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l'], p=choice_ratio[1]))
+            if each <= 4:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[0]))
+            elif each <= 6:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[1]))
+            elif each <= 8:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[2]))
+            elif each == 9:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[3]))
+            elif each == 10:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[4]))
+            elif each <= 13:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[5]))
+            elif each <= 16:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[6]))
+            elif each <= 19:
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[7]))
             else:
-                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l'], p=choice_ratio[2]))
+                pt = self.get_park_time_by_type(np.random.choice(['s', 'm', 'l', 'el'], p=choice_ratio[8]))
             park_duration.append(pt)
 
         return park_duration
@@ -166,14 +182,10 @@ class Demand:
         for each in arrival_times_hours:
             if each <= 6:
                 ct = self.get_charge_time_by_type(np.random.choice(['slow', 'fast'], p=choice_ratio[0]))
-            elif 6 < each <= 12:
+            elif each <= 9:
                 ct = self.get_charge_time_by_type(np.random.choice(['slow', 'fast'], p=choice_ratio[1]))
-            elif 12 < each <= 17:
+            else:
                 ct = self.get_charge_time_by_type(np.random.choice(['slow', 'fast'], p=choice_ratio[2]))
-            elif 17 < each <= 22:
-                ct = self.get_charge_time_by_type(np.random.choice(['slow', 'fast'], p=choice_ratio[3]))
-            elif 22 < each <= 24:
-                ct = self.get_charge_time_by_type(np.random.choice(['slow', 'fast'], p=choice_ratio[4]))
             charge_duration.append(ct)
         return charge_duration
 
@@ -227,8 +239,8 @@ def all_info(park_num, charge_ratio, O, D, park_info, charge_info):
     all_.iloc[:, 1] = park_info[1]  # arrival t
     all_.iloc[:, 2] = park_info[2]  # activity t
     all_.iloc[:, 4] = label  # label
-    all_.iloc[:, 5] = np.random.choice(range(O), size=len(label), p=[0.5,0.5])  # o
-    all_.iloc[:, 6] = np.random.choice(range(D), size=len(label),p=[0.5,0.5])  # d
+    all_.iloc[:, 5] = np.random.choice(range(O), size=len(label), p=[0.5, 0.5])  # o
+    all_.iloc[:, 6] = np.random.choice(range(D), size=len(label), p=[0.5, 0.5])  # d
     all_['new_label'] = all_.apply(assign_new_label, axis=1)
     # 将到达时间转换为min
     all_['request_t'] = (all_['request_t'] * 60).astype(int)
@@ -248,4 +260,17 @@ def main(park_arrival_num, charge_ratio):
     p_t = demand.park_duration_dis(p_arr)
     c_t = demand.charge_duration_dis(c_arr)
     p_r, c_r = request_time_dis(p_arr, c_arr)
-    return all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t], [c_r, c_arr, c_t])
+    # test_plot(p_arr,c_arr,p_t,c_t)
+
+    # 训练的时候打开
+    # return all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t], [c_r, c_arr, c_t])
+
+    # 训练的时候关闭
+    demand_data = all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t],
+                           [c_r, c_arr, c_t])
+
+    demand_data.to_csv(fr"G:\2023-纵向\停车分配\需求分布\demand data\{park_arrival_num}-{charge_ratio}.csv")
+
+
+if __name__ == '__main__':
+    main(100, 0.2)
