@@ -15,10 +15,31 @@ class Parkinglot:
 
 def get_parking_lot(parking_lot_num=4):
     # 4个停车场
-    pl1 = Parkinglot(id=1, total_num=40, charge_num=10, slow_charge_num=3)
-    pl2 = Parkinglot(id=2, total_num=20, charge_num=5, slow_charge_num=1)
-    pl3 = Parkinglot(id=3, total_num=10, charge_num=2, slow_charge_num=1)
-    pl4 = Parkinglot(id=4, total_num=30, charge_num=8, slow_charge_num=2)
+    # pl1 = Parkinglot(id=1, total_num=40, charge_num=10, slow_charge_num=3)
+    # pl2 = Parkinglot(id=2, total_num=20, charge_num=5, slow_charge_num=1)
+    # pl3 = Parkinglot(id=3, total_num=10, charge_num=2, slow_charge_num=1)
+    # pl4 = Parkinglot(id=4, total_num=30, charge_num=8, slow_charge_num=2)
+    # 1:1 配建 （快充:慢充 4:1）
+    # pl1 = Parkinglot(id=1, total_num=40, charge_num=32, slow_charge_num=6)
+    # pl2 = Parkinglot(id=2, total_num=20, charge_num=16, slow_charge_num=3)
+    # pl3 = Parkinglot(id=3, total_num=10, charge_num=8, slow_charge_num=2)
+    # pl4 = Parkinglot(id=4, total_num=30, charge_num=24, slow_charge_num=5)
+
+    pl1 = Parkinglot(id=1, total_num=40, charge_num=20, slow_charge_num=4)
+    pl2 = Parkinglot(id=2, total_num=20, charge_num=10, slow_charge_num=2)
+    pl3 = Parkinglot(id=3, total_num=10, charge_num=5, slow_charge_num=1)
+    pl4 = Parkinglot(id=4, total_num=30, charge_num=15, slow_charge_num=3)
+
+    # pl1 = Parkinglot(id=1, total_num=40, charge_num=8, slow_charge_num=1)
+    # pl2 = Parkinglot(id=2, total_num=20, charge_num=4, slow_charge_num=1)
+    # pl3 = Parkinglot(id=3, total_num=10, charge_num=2, slow_charge_num=1)
+    # pl4 = Parkinglot(id=4, total_num=30, charge_num=6, slow_charge_num=1)
+
+    # pl1 = Parkinglot(id=1, total_num=40, charge_num=10, slow_charge_num=2)
+    # pl2 = Parkinglot(id=2, total_num=20, charge_num=5, slow_charge_num=1)
+    # pl3 = Parkinglot(id=3, total_num=10, charge_num=4, slow_charge_num=1)
+    # pl4 = Parkinglot(id=4, total_num=30, charge_num=6, slow_charge_num=1)
+
     pl = [pl1, pl2, pl3, pl4]
     current_pl_num = len(pl)
     if current_pl_num < parking_lot_num:

@@ -2,57 +2,15 @@
 动态优化
 以15min为决策间隔
 """
-from datetime import datetime
+
 from entity import OD
 from utils import *
 from gurobipy import *
 import pandas as pd
 
-# 需求信息
-park_arrival_num = 150
-charge_ratio = 0.2
-# req_info = demand.main(park_arrival_num=park_arrival_num,
-#                        charge_ratio=charge_ratio)  # 返回信息 [request_t, arrival_t,activity_t,leave_t,label,O,D]
-req_info = pd.read_csv(f"G:\\2023-纵向\\停车分配\\需求分布\\demand data\\{park_arrival_num}-0.2.csv")
 
-# OD及停车场信息
-O, D, Z, cost_matrix = OD.OdCost().get_od_info()  # 起点数量 终点数量 停车场数量 时间矩阵
-pl1, pl2, pl3, pl4 = parkinglot.get_parking_lot(parking_lot_num=Z)
-pl = [pl1, pl2, pl3, pl4]
-
-# 将请求排序 并计算所在的间隔
-decision_interval = 15
-req_info = req_info.sort_values(by="request_t")
-earliest_request = min(req_info['request_t'])
-req_info['request_interval'] = (req_info['request_t'] - earliest_request) // decision_interval
-request_interval = req_info['request_interval'].unique()
-
-
-park_fee = pl1.park_fee / 2  # 半个小时的费用
-charge_fee = [0, pl1.fast_charge_fee, pl1.slow_charge_fee]  # 每分钟的价格
-reserved_fee = pl1.reserve_fee  # 预约费用
-req_info['revenue'] = [(np.floor(req_info['activity_t'].iloc[i] / 15) * park_fee + (
-        req_info['activity_t'].iloc[i] * (charge_fee[req_info['new_label'].iloc[i]])) + reserved_fee) for i in
-                       range(len(req_info))]
-
-#
-N = pl1.total_num + pl2.total_num + pl3.total_num + pl4.total_num  # 总泊位数
-K = max(req_info['leave_t'])  # 时间长度
-I = request_interval  # 迭代次数  （需求个数）
-S_NK = np.zeros((len(I) + 1, N, K)).astype(int)  # 供给状态 每轮迭代更新
-X_NM_total = []  # 每轮分配结果
-REVENUE_total = [[0, 0, 0, 0, 0, 0, 0, 0, 0] for _ in range(len(I) + 1)]  # i时段 目标函数，停车/充电收益，拒绝数量，步行时间；
-
-# 泊位索引
-T_ZN, _, EACH_INDEX = T_ZN(Z, N, pl)
-_, OPS_INDEX = P_ZN(Z, N, pl)
-_, CPS_INDEX = C_ZN(Z, N, pl)
-_, FAST_INDEX = Fast_ZN(Z, N, pl)
-_, SLOW_INDEX = Slow_ZN(Z, N, pl)
-
-
-def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
-    r_mk = get_rmk(req_info).astype(int)  # 二维的0-1矩阵  req_num,max_leave
+def dp(rule, alpha1=1, alpha2=1, alpha3=0):
+    r_mk = get_rmk_(req_info).astype(int)  # 二维的0-1矩阵  req_num,max_leave
     assign_info = []
 
     for ith, i in enumerate(request_interval):
@@ -97,26 +55,12 @@ def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
                 (m, z)] for m in total_index for z in range(Z))
 
         obj4 = quicksum(
-            cruise_t(z, S_NK[ith], EACH_INDEX[z], req_info['arrival_t'].loc[m]) * y_mz[(m, z)] for m in total_index for z in
+            cruise_t(z, S_NK[ith], EACH_INDEX[z], req_info['arrival_t'].loc[m]) * y_mz[(m, z)] for m in total_index for
+            z in
             range(Z))
 
         # 总目标
         obj = alpha1 * obj1 - alpha2 * obj2 - alpha3 * obj3
-
-        # m.setObjective(obj, GRB.MAXIMIZE)
-        # m.addConstrs(y_zm[(z, m)] == y_mz[(m, z)] for z in range(Z) for m in total_index)
-        # m.addConstrs(
-        #     S_NK[ith][n][k] + quicksum(x_nm[(n, m)] * r_mk[m][k] for m in park_index) <= 1 for n in OPS_INDEX for k in
-        #     range(K))
-        # m.addConstrs(
-        #     S_NK[ith][n][k] + quicksum(x_nm[(n, m)] * r_mk[m][k] for m in fast_charge_index) <= 1 for n in FAST_INDEX
-        #     for k in range(K))
-        # m.addConstrs(
-        #     S_NK[ith][n][k] + quicksum(x_nm[(n, m)] * r_mk[m][k] for m in slow_charge_index) <= 1 for n in SLOW_INDEX
-        #     for k in range(K))
-        # m.addConstrs(quicksum(T_ZN[z][n] * x_nm[(n, m)] for n in range(N)) == y_zm[(z, m)] for z in range(Z) for m in
-        #              total_index)
-        # m.addConstrs(quicksum(x_nm[(n, m)] for n in range(N)) <= 1 for m in total_index)
 
         m.setObjective(obj, GRB.MAXIMIZE)
         m.addConstrs(y_zm[(z, m)] == y_mz[(m, z)] for z in range(Z) for m in total_index)
@@ -125,23 +69,105 @@ def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
             range(K))
         m.addConstrs(quicksum(T_ZN[z][n] * x_nm[(n, m)] for n in range(N)) == y_zm[(z, m)] for z in range(Z) for m in
                      total_index)
+        m.addConstrs(quicksum(x_nm[(n, m)] for n in range(N)) <= 1 for m in total_index)
 
         if rule == 1:
             # rule1
             # 停车请求只能分配到OPS
-            m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) <= 1 for m in park_index)
+            # m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) <= 1 for m in park_index)
             m.addConstrs(quicksum(x_nm[(n, m)] for n in CPS_INDEX) == 0 for m in park_index)
-        else:
+        elif rule == 2:
             # rule2:
             # 停车请求可以分配到OPS和CPS
-            m.addConstrs(quicksum(x_nm[(n, m)] for n in range(N)) <= 1 for m in park_index)
+            # m.addConstrs(quicksum(x_nm[(n, m)] for n in range(N)) <= 1 for m in park_index)
+            pass
+        elif rule == 3:
+            # 只有在规定时间内停车请求可以分配到充电桩
+            # 8-10 17-19 可以停放（到达时间为480-600或1020-1140）
+            # 初步筛选出 park_index 对应的行
+            filtered_df = req_info.loc[park_index]
+            # 在初步筛选出的行中，进一步筛选出 arrival_t 在 480 和 600 之间的行，并获取这些行的原始索引
+            allocatable_index_1 = filtered_df[
+                (filtered_df['arrival_t'] >= 480) & (filtered_df['arrival_t'] <= 600)].index.tolist()
+            # 在初步筛选出的行中，进一步筛选出 arrival_t 在 1020 和 1140 之间的行，并获取这些行的原始索引
+            allocatable_index_2 = filtered_df[
+                (filtered_df['arrival_t'] >= 1020) & (filtered_df['arrival_t'] <= 1140)].index.tolist()
+            # 合并两个列表
+            allocatable_index = allocatable_index_1 + allocatable_index_2
+            # 符合条件的停车请求可以分配到OPS和CPS
+            # m.addConstrs(quicksum(x_nm[(n, m)] for n in range(N)) <= 1 for m in allocatable_index)
+            # 不符合的只能分配到OPS
+            no_allocatable_index = list(set(park_index) - set(allocatable_index))
+            # m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) <= 1 for m in no_allocatable_index)
+            m.addConstrs(quicksum(x_nm[(n, m)] for n in CPS_INDEX) == 0 for m in no_allocatable_index)
+        elif rule == 4:
+            # 短时停车停放在快充桩 长时停车停放在慢充桩
+            # 短时停车(<=30分钟) 长时停车(30-150)
+            # 筛选出 park_index 对应的行
+            filtered_df = req_info.loc[park_index]
+            # 在筛选出的行中，进一步筛选 activity_t <= 30 的行，并获取这些行的原始索引
+            allocatable_short_index = filtered_df[filtered_df['activity_t'] <= 30].index.tolist()
+            # 在筛选出的行中，进一步筛选 30 < activity_t <= 150 的行，并获取这些行的原始索引
+            allocatable_long_index = filtered_df[
+                (filtered_df['activity_t'] > 30) & (filtered_df['activity_t'] <= 150)].index.tolist()
+            no_allocatable_index = list(set(park_index) - set(allocatable_short_index) - set(allocatable_long_index))
+            try:
+                # 短时停车请求分配到快充电桩
+                # m.addConstrs(quicksum(x_nm[(n, m)] for n in (OPS_INDEX + FAST_INDEX)) <= 1 for m in allocatable_short_index)
+                m.addConstrs(quicksum(x_nm[(n, m)] for n in SLOW_INDEX) == 0 for m in allocatable_short_index)
+            except:
+                pass
+            try:
+                # 长时停车请求分配到慢充桩
+                # m.addConstrs(quicksum(x_nm[(n, m)] for n in (OPS_INDEX + SLOW_INDEX)) <= 1 for m in allocatable_long_index)
+                m.addConstrs(quicksum(x_nm[(n, m)] for n in FAST_INDEX) == 0 for m in allocatable_long_index)
+            except:
+                pass
+            # 其他请求分配到OPS
+            # m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) <= 1 for m in no_allocatable_index)
+            m.addConstrs(quicksum(x_nm[(n, m)] for n in CPS_INDEX) == 0 for m in no_allocatable_index)
+        else:
+            # rule3和rule4的结合
+            # 初步筛选出 park_index 对应的行
+            filtered_df = req_info.loc[park_index]
+            # 在初步筛选出的行中，进一步筛选出 arrival_t 在 480 和 600 之间的行，并获取这些行的原始索引
+            allocatable_index_1 = filtered_df[
+                (filtered_df['arrival_t'] >= 480) & (filtered_df['arrival_t'] <= 600)].index.tolist()
+            # 在初步筛选出的行中，进一步筛选出 arrival_t 在 1020 和 1140 之间的行，并获取这些行的原始索引
+            allocatable_index_2 = filtered_df[
+                (filtered_df['arrival_t'] >= 1020) & (filtered_df['arrival_t'] <= 1140)].index.tolist()
+            allocatable_time_index = allocatable_index_1 + allocatable_index_2
+
+            # 在筛选出的行中，进一步筛选 activity_t <= 30 的行，并获取这些行的原始索引
+            allocatable_short_activity_index = filtered_df[filtered_df['activity_t'] <= 30].index.tolist()
+            # 在筛选出的行中，进一步筛选 30 < activity_t <= 150 的行，并获取这些行的原始索引
+            allocatable_long_activity_index = filtered_df[
+                (filtered_df['activity_t'] > 30) & (filtered_df['activity_t'] <= 150)].index.tolist()
+            allocatable_short_index = list(set(allocatable_time_index) & set(allocatable_short_activity_index))
+            allocatable_long_index = list(set(allocatable_time_index) & set(allocatable_long_activity_index))
+            no_allocatable_index = list(set(park_index) - set(allocatable_short_index) - set(allocatable_long_index))
+            try:
+                # 短时停车请求分配到快充电桩
+                # m.addConstrs(quicksum(x_nm[(n, m)] for n in (OPS_INDEX + FAST_INDEX)) <= 1 for m in allocatable_short_index)
+                m.addConstrs(quicksum(x_nm[(n, m)] for n in SLOW_INDEX) == 0 for m in allocatable_short_index)
+            except:
+                pass
+            try:
+                # 长时停车请求分配到慢充桩
+                # m.addConstrs(quicksum(x_nm[(n, m)] for n in (OPS_INDEX + SLOW_INDEX)) <= 1 for m in allocatable_long_index)
+                m.addConstrs(quicksum(x_nm[(n, m)] for n in FAST_INDEX) == 0 for m in allocatable_long_index)
+            except:
+                pass
+            # 其他请求分配到OPS
+            # m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) <= 1 for m in no_allocatable_index)
+            m.addConstrs(quicksum(x_nm[(n, m)] for n in CPS_INDEX) == 0 for m in no_allocatable_index)
 
         # 快充电请求只能分配到快充CPS
-        m.addConstrs(quicksum(x_nm[(n, m)] for n in FAST_INDEX) <= 1 for m in fast_charge_index)
+        # m.addConstrs(quicksum(x_nm[(n, m)] for n in FAST_INDEX) <= 1 for m in fast_charge_index)
         m.addConstrs(quicksum(x_nm[(n, m)] for n in SLOW_INDEX) == 0 for m in fast_charge_index)
         m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) == 0 for m in fast_charge_index)
         # 慢充电请求只能分配到慢充CPS
-        m.addConstrs(quicksum(x_nm[(n, m)] for n in SLOW_INDEX) <= 1 for m in slow_charge_index)
+        # m.addConstrs(quicksum(x_nm[(n, m)] for n in SLOW_INDEX) <= 1 for m in slow_charge_index)
         m.addConstrs(quicksum(x_nm[(n, m)] for n in FAST_INDEX) == 0 for m in slow_charge_index)
         m.addConstrs(quicksum(x_nm[(n, m)] for n in OPS_INDEX) == 0 for m in slow_charge_index)
 
@@ -165,7 +191,7 @@ def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
                 if x_nm[(n, m_)].X == 1:
                     for z in range(Z):
                         if y_zm[(z, m_)].X == 1:
-                            assign_info.append([m_, n, z, REVENUE_total[ith + 1][8],i])
+                            assign_info.append([m_, n, z, REVENUE_total[ith + 1][8], i])
 
         S_NK[ith + 1] = S_NK[ith] + np.matmul(X_NM, R_MK)
 
@@ -225,7 +251,7 @@ def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
                    P_park_acc, P_char_acc, parking_util, charging_util, P_travel, P_cruising]
 
     # 保存数据
-    os.chdir('../save_data/classified_data')
+    os.chdir(r'G:\2023-纵向\停车分配\save_data\需求11供给31')
 
     try:
         os.makedirs(f'{park_arrival_num}-{charge_ratio}')
@@ -248,7 +274,7 @@ def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
         for item in result_list:
             file.write(str(item) + '\n')  # 添加换行符以确保列表中的每个项目都在新的一行
     os.chdir('../')
-    np.save(f"SNK_info/dp_{rule}.npy", S_NK)
+    np.save(f"SNK_info/dp_{rule}.npy", S_NK[-1])
     np.save(f"revenue_info/dp_{rule}.npy", REVENUE_total)
     np.save(f"result_info/dp_{rule}.npy", result_list)
     assign_info_data = pd.DataFrame(columns=['req_id', 'space_num', 'pl_num', 'cruising_t', 'assign_t'],
@@ -256,4 +282,55 @@ def dp(rule, alpha1=0.7, alpha2=0.1, alpha3=0.2):
     assign_info_data.to_csv(f"assign_info/dp_{rule}.csv", index=False)
 
 
-dp(rule=2)
+if __name__ == '__main__':
+    # 需求信息
+    global park_arrival_num
+    charge_ratio = 1
+
+
+    # OD及停车场信息
+    O, D, Z, cost_matrix = OD.OdCost().get_od_info()  # 起点数量 终点数量 停车场数量 时间矩阵
+    pl1, pl2, pl3, pl4 = parkinglot.get_parking_lot(parking_lot_num=Z)
+    pl = [pl1, pl2, pl3, pl4]
+
+
+
+    park_fee = pl1.park_fee / 2  # 半个小时的费用
+    charge_fee = [0, pl1.fast_charge_fee, pl1.slow_charge_fee]  # 每分钟的价格
+    reserved_fee = pl1.reserve_fee  # 预约费用
+
+    #
+    N = pl1.total_num + pl2.total_num + pl3.total_num + pl4.total_num  # 总泊位数
+
+    # 泊位索引
+    T_ZN, _, EACH_INDEX = T_ZN(Z, N, pl)
+    _, OPS_INDEX = P_ZN(Z, N, pl)
+    _, CPS_INDEX = C_ZN(Z, N, pl)
+    _, FAST_INDEX = Fast_ZN(Z, N, pl)
+    _, SLOW_INDEX = Slow_ZN(Z, N, pl)
+
+    for i in [100,150,200]:
+        park_arrival_num = i
+        req_info = pd.read_csv(f"G:\\2023-纵向\\停车分配\\需求分布\\demand0607\\{park_arrival_num}-{charge_ratio}.csv")
+
+        # 将请求排序 并计算所在的间隔
+        decision_interval = 15
+        req_info.sort_values(by="request_t", inplace=True)
+        earliest_request = min(req_info['request_t'])
+        req_info['request_interval'] = (req_info['request_t'] - earliest_request) // decision_interval
+        request_interval = req_info['request_interval'].unique()
+
+        req_info['revenue'] = [(np.floor(req_info['activity_t'].iloc[i] / 15) * park_fee + (
+                req_info['activity_t'].iloc[i] * (charge_fee[req_info['new_label'].iloc[i]])) + reserved_fee) for i in
+                               range(len(req_info))]
+
+        K = max(req_info['leave_t'])  # 时间长度
+        I = request_interval  # 迭代次数  （需求个数）
+        S_NK = np.zeros((len(I) + 1, N, K)).astype(int)  # 供给状态 每轮迭代更新
+        X_NM_total = []  # 每轮分配结果
+        REVENUE_total = [[0, 0, 0, 0, 0, 0, 0, 0, 0] for _ in range(len(I) + 1)]  # i时段 目标函数，停车/充电收益，拒绝数量，步行时间；
+
+        for j in range(1,6):
+            dp(rule=j)
+            print(f"park_num:{i},rule:{j}")
+

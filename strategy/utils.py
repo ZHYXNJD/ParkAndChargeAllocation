@@ -1,6 +1,7 @@
 """
 分配时用到的一些工具
 """
+import json
 import os
 from datetime import datetime
 
@@ -119,24 +120,18 @@ def cruise_t(z, snk, index, arrival_t):
     return 4.467 * np.power(occ_rate, 18.86)
 
 
-def save_reinforcement(result_list, rule):
-    # 保存数据
-    try:
-        os.makedirs('../save_data_reinforce')
-    except:
-        pass
+def save_episode_results(data_frame,supply,args):
 
     folder_name = str(datetime.now().strftime("%m-%d-%H-%M"))
     save_path = '../save_data_reinforce/' + folder_name
     os.makedirs(save_path)
     # 打开文件进行写入
-    result = result_list[:-1]
-    supply_pl = result_list[-1]
-    with open(save_path+'/reinforce_{}.txt'.format(rule), 'w') as file:
-        # 遍历列表，写入每个元素到文件
-        for item in result:
-            file.write(str(item) + '\n')  # 添加换行符以确保列表中的每个项目都在新的一行
-    np.save(save_path + '/supply_pl.npy', supply_pl)
+    config = json.dumps(vars(args))
+    with open(save_path+'/config.txt','w') as f:
+        f.write(config)
+        f.write('\n')
+    data_frame.to_csv(save_path + '/episode_results.csv')
+    np.save(save_path + '/supply_pl.npy', supply)
 
 
 def test():

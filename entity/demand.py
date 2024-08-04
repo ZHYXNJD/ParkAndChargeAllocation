@@ -9,11 +9,6 @@ from entity import OD
 
 matplotlib.use('TkAgg')
 
-# 确保可以复现
-
-# 评估的时候打开随机种子  训练的时候关闭掉
-np.random.seed(1000)
-
 
 def truncated_gaussian(mean, std):
     a, b = (0 - mean) / std, np.inf
@@ -114,10 +109,28 @@ class Demand:
         park_arrival_per_hour, _ = self.arrival_per_hour()
         arrival_times_hours = []  # 存储小时单位的到达时间
         for i in range(len(park_arrival_per_hour)):
+            # if i == 0:
+            #     arrival_times_hours.extend(np.sort(np.random.uniform(0, 7, park_arrival_per_hour[0])))
+            # else:
+            #     arrival_times_hours.extend(np.sort(np.random.uniform(i + 6, i + 7, park_arrival_per_hour[i])))
+
             if i == 0:
-                arrival_times_hours.extend(np.sort(np.random.uniform(0, 7, park_arrival_per_hour[0])))  # 0-7时段
+                arrival_times_hours.extend(np.sort(np.random.uniform(0, 7, park_arrival_per_hour[i])))
+            elif i == 1:
+                arrival_times_hours.extend(np.sort(np.random.uniform(7, 8, park_arrival_per_hour[i])))
+            elif i == 2:
+                arrival_times_hours.extend(np.sort(np.random.uniform(8, 10, park_arrival_per_hour[i])))
+            elif i == 3:
+                arrival_times_hours.extend(np.sort(np.random.uniform(10, 12, park_arrival_per_hour[i])))
+            elif i == 4:
+                arrival_times_hours.extend(np.sort(np.random.uniform(12, 17, park_arrival_per_hour[i])))
+            elif i == 5:
+                arrival_times_hours.extend(np.sort(np.random.uniform(17, 20, park_arrival_per_hour[i])))
+            elif i == 6:
+                arrival_times_hours.extend(np.sort(np.random.uniform(20, 21, park_arrival_per_hour[i])))
             else:
-                arrival_times_hours.extend(np.sort(np.random.uniform(i + 6, i + 7, park_arrival_per_hour[i])))
+                arrival_times_hours.extend(np.sort(np.random.uniform(21, 24, park_arrival_per_hour[i])))
+
         return arrival_times_hours
 
     def get_park_time_by_type(self, park_type):
@@ -165,7 +178,24 @@ class Demand:
         _, charge_arrival_per_hour = self.arrival_per_hour()
         arrival_times_hours = []  # 存储小时单位的到达时间
         for i in range(len(charge_arrival_per_hour)):
-            arrival_times_hours.extend(np.sort(np.random.uniform(i, i + 1, charge_arrival_per_hour[i])))
+            # arrival_times_hours.extend(np.sort(np.random.uniform(i, i + 1, charge_arrival_per_hour[i])))
+            if i == 0:
+                arrival_times_hours.extend(np.sort(np.random.uniform(0, 1, charge_arrival_per_hour[i])))
+            elif i == 1:
+                arrival_times_hours.extend(np.sort(np.random.uniform(1,10, charge_arrival_per_hour[i])))
+            elif i == 2:
+                arrival_times_hours.extend(np.sort(np.random.uniform(10, 11, charge_arrival_per_hour[i])))
+            elif i == 3:
+                arrival_times_hours.extend(np.sort(np.random.uniform(11, 12, charge_arrival_per_hour[i])))
+            elif i == 4:
+                arrival_times_hours.extend(np.sort(np.random.uniform(12, 13, charge_arrival_per_hour[i])))
+            elif i == 5:
+                arrival_times_hours.extend(np.sort(np.random.uniform(13, 19, charge_arrival_per_hour[i])))
+            elif i == 6:
+                arrival_times_hours.extend(np.sort(np.random.uniform(19, 22, charge_arrival_per_hour[i])))
+            else:
+                arrival_times_hours.extend(np.sort(np.random.uniform(22, 24, charge_arrival_per_hour[i])))
+
         return arrival_times_hours
 
     def get_charge_time_by_type(self, charge_type):
@@ -251,7 +281,12 @@ def all_info(park_num, charge_ratio, O, D, park_info, charge_info):
     return all_
 
 
-def main(park_arrival_num, charge_ratio):
+def main(park_arrival_num, charge_ratio,plot=False,train=False):
+    if not train:
+        # 确保可以复现
+        # 评估的时候打开随机种子  训练的时候关闭掉
+        np.random.seed(1000)
+
     origin_num = OD.OdCost().O
     destination_num = OD.OdCost().D
     demand = Demand(park_arrival_num, charge_ratio)
@@ -260,17 +295,22 @@ def main(park_arrival_num, charge_ratio):
     p_t = demand.park_duration_dis(p_arr)
     c_t = demand.charge_duration_dis(c_arr)
     p_r, c_r = request_time_dis(p_arr, c_arr)
-    # test_plot(p_arr,c_arr,p_t,c_t)
 
-    # 训练的时候打开
-    # return all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t], [c_r, c_arr, c_t])
-
+    if plot:
+        test_plot(p_arr,c_arr,p_t,c_t)
+        return 0
     # 训练的时候关闭
-    demand_data = all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t],
-                           [c_r, c_arr, c_t])
+    if not train:
+        demand_data = all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t],
+                               [c_r, c_arr, c_t])
 
-    demand_data.to_csv(fr"G:\2023-纵向\停车分配\需求分布\demand data\{park_arrival_num}-{charge_ratio}.csv")
+        demand_data.to_csv(fr"G:\2023-纵向\停车分配\需求分布\demand0607\{park_arrival_num}-{charge_ratio}.csv")
+    # 训练的时候打开
+    else:
+        return all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t], [c_r, c_arr, c_t])
 
 
 if __name__ == '__main__':
-    main(100, 0.2)
+    for i in [100,150,200]:
+        main(i,0.25)
+    # main(park_arrival_num=300,charge_ratio=1,plot=False)
