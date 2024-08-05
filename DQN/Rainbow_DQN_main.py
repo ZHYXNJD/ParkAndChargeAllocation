@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--use_double", type=bool, default=True, help="Whether to use double Q-learning")
     parser.add_argument("--use_dueling", type=bool, default=True, help="Whether to use dueling network")
-    parser.add_argument("--use_noisy", type=bool, default=True, help="Whether to use noisy network")
+    parser.add_argument("--use_noisy", type=bool, default=False, help="Whether to use noisy network")
     parser.add_argument("--use_per", type=bool, default=True, help="Whether to use PER")
     parser.add_argument("--use_n_steps", type=bool, default=True, help="Whether to use n_steps Q-learning")
 
@@ -279,5 +279,5 @@ if __name__ == '__main__':
     # for seed in [0, 10, 100]:
     #     runner = Runner(args=args,number=1, seed=seed)
     #     runner.run()
-    runner = Runner(args=args, number=22, seed=1)
+    runner = Runner(args=args, number=25, seed=1)
     runner.run()
