@@ -61,7 +61,7 @@ drawing_LL(plt, algorithm='DQN_dueling_Noisy_PER_N_steps', number=1, color=color
 
 drawing_LL(plt, algorithm='DQN_double_Noisy_PER_N_steps', number=1, color=colors[2], label='Rainbow_DQN without Dueling')
 
-drawing_LL(plt, algorithm='DQN_double_dueling_Noisy_N_steps', number=1, color=colors[3], label='Rainbow DQN without PER')
+drawing_LL(plt, algorithm='DQN_double_dueling_Noisy_N_steps', number=1, color=colors[3], label='Rainbow save_DQN without PER')
 
 drawing_LL(plt, algorithm='DQN_double_dueling_Noisy_PER', number=1, color=colors[4], label='Rainbow_DQN without N-steps')
 

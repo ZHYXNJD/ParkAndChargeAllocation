@@ -29,8 +29,8 @@ def get_revenue(req_info):
 
 def get_train_req(park_arrival_num, charge_ratio):
     # 更新需求
-    req_info = demand.main(park_arrival_num, charge_ratio, train=True)
-    # req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand0607\400-0.25.csv")
+    # req_info = demand.main(park_arrival_num, charge_ratio, train=True)
+    req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand0607\400-0.25.csv")
     return get_revenue(req_info)
 
 
@@ -254,7 +254,7 @@ class Env:
                 mask[mask_list] = 0
                 return mask
             else:
-                mask_list = [1, 3, 4, 5, 7, 8, 10, 11, 13]
+                mask_list = [1, 2, 4, 5, 7, 8, 10, 11, 13]
                 if len(add_mask) > 0:
                     mask_list.extend([each * 3 + 3 for each in add_mask])
                 mask[mask_list] = 0

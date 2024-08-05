@@ -84,7 +84,7 @@ class PPO_discrete:
             self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=self.lr_a)
             self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=self.lr_c)
 
-    def evaluate(self, s,invailid_choice):  # When evaluating the policy, we select the action with the highest probability
+    def evaluate(self, s,invailid_choice):  #  When evaluating the policy, we select the action with the highest probability
         # 评估的时候也要需要做mask？
         s = torch.unsqueeze(torch.tensor(s, dtype=torch.float), 0)
         a_prob = self.actor(s).detach().numpy().flatten()

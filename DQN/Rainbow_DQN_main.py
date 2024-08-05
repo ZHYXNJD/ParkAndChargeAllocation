@@ -51,7 +51,7 @@ class Runner:
             self.replay_buffer = ReplayBuffer(args)
         self.agent = DQN(args)
 
-        self.algorithm = 'DQN'
+        self.algorithm = 'save_DQN'
         if args.use_double and args.use_dueling and args.use_noisy and args.use_per and args.use_n_steps:
             self.algorithm = 'Rainbow_' + self.algorithm
         else:
@@ -66,9 +66,9 @@ class Runner:
             if args.use_n_steps:
                 self.algorithm += "_N_steps"
 
-        self.writer = SummaryWriter(log_dir='runs/{}_number_{}_seed_{}'.format(self.algorithm, number, seed))
+        self.writer = SummaryWriter(log_dir='../save_data_reinforce/save_DQN/runs/{}_number_{}_seed_{}'.format(self.algorithm, number, seed))
 
-        with open('configs/{}_number_{}_seed{}.txt'.format(self.algorithm, number, seed), 'w') as f:
+        with open('../save_data_reinforce/save_DQN/configs/{}_number_{}_seed{}.txt'.format(self.algorithm, number, seed), 'w') as f:
             write_args(f, args)
 
         self.total_steps = 0  # Record the total steps during the training
@@ -83,22 +83,22 @@ class Runner:
     def save_train_data(self,number,seed,episode_data,train_loss,step_reward):
 
         try:
-            os.makedirs('data_train/number_{}_seed_{}'.format(number,seed))
+            os.makedirs('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}'.format(number,seed))
         except:
             pass
 
         column_name = ['episode', 'acc rewards', 'total rev', 'park rev', 'char rev', 'park refuse', 'char refuse',
                        'travel cost', 'cruise cost']
-        pd.DataFrame(columns=column_name,data=episode_data).to_csv('data_train/number_{}_seed_{}/episode_data.csv'.format(number,seed))
-        pd.DataFrame(columns={'step','loss'},data=train_loss).to_csv('data_train/number_{}_seed_{}/train_loss.csv'.format(number,seed))
-        pd.DataFrame(columns={'step','reward'},data=step_reward).to_csv('data_train/number_{}_seed_{}/step_reward.csv'.format(number,seed))
+        pd.DataFrame(columns=column_name,data=episode_data).to_csv('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/episode_data.csv'.format(number,seed))
+        pd.DataFrame(columns={'step','loss'},data=train_loss).to_csv('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/train_loss.csv'.format(number,seed))
+        pd.DataFrame(columns={'step','reward'},data=step_reward).to_csv('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/step_reward.csv'.format(number,seed))
 
     def save_episode_assign_data(self,number,seed,episode_number,assign_info):
         try:
-            os.makedirs('data_episode/number_{}_seed_{}'.format(number,seed))
+            os.makedirs('../save_data_reinforce/save_DQN/data_episode/number_{}_seed_{}'.format(number,seed))
         except:
             pass
-        pd.DataFrame(columns={'t','req_id','req_info','pl_num'},data=assign_info).to_csv('data_episode/number_{}_seed_{}/episode_{}_assign.csv'.format(number,seed,episode_number))
+        pd.DataFrame(columns={'t','req_id','req_info','pl_num'},data=assign_info).to_csv('../save_data_reinforce/save_DQN/data_episode/number_{}_seed_{}/episode_{}_assign.csv'.format(number,seed,episode_number))
 
 
     def run(self, ):
@@ -219,7 +219,7 @@ class Runner:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser("Hyperparameter Setting for DQN")
+    parser = argparse.ArgumentParser("Hyperparameter Setting for save_DQN")
 
     parser.add_argument("--park_arrival_num", type=int, default=400, help="park arrival number")
     parser.add_argument("--charge_ratio", type=float, default=0.25, help="charge ratio")
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     parser.add_argument("--acc", type=int, default=10)
     parser.add_argument("--r_with_no_d", type=int, default=0)
     parser.add_argument("--r_p_no_avail", type=int, default=-10)
-    parser.add_argument("--r_c_no_avail", type=int, default=-10)
+    parser.add_argument("--r_c_no_avail", type=int, default=-30)
 
     parser.add_argument("--max_train_steps", type=int, default=500 * 1440, help=" Maximum number of training steps")
     parser.add_argument("--evaluate_freq", type=float, default=1e3,
@@ -245,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument("--hidden_dim", type=int, default=256,
                         help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate of actor")
-    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--gamma", type=float, default=0.999, help="Discount factor")
     parser.add_argument("--epsilon_init", type=float, default=0.5, help="Initial epsilon")
     parser.add_argument("--epsilon_min", type=float, default=0.1, help="Minimum epsilon")
     parser.add_argument("--epsilon_decay_steps", type=int, default=int(1e5),
@@ -279,5 +279,5 @@ if __name__ == '__main__':
     # for seed in [0, 10, 100]:
     #     runner = Runner(args=args,number=1, seed=seed)
     #     runner.run()
-    runner = Runner(args=args, number=20, seed=1)
+    runner = Runner(args=args, number=22, seed=1)
     runner.run()

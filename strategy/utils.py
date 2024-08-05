@@ -127,7 +127,7 @@ def save_episode_results(data_frame,supply,args):
     os.makedirs(save_path)
     # 打开文件进行写入
     config = json.dumps(vars(args))
-    with open(save_path+'/config.txt','w') as f:
+    with open(save_path+'/configs.txt','w') as f:
         f.write(config)
         f.write('\n')
     data_frame.to_csv(save_path + '/episode_results.csv')
