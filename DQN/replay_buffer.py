@@ -27,8 +27,7 @@ class ReplayBuffer(object):
         self.buffer['done'][self.count] = done
         self.buffer['this_invalid_action'][self.count] = this_invalid_action
         self.buffer['next_invalid_action'][self.count] = next_invalid_action
-        self.count = (
-                                 self.count + 1) % self.buffer_capacity  # When the 'count' reaches buffer_capacity, it will be reset to 0.
+        self.count = (self.count + 1) % self.buffer_capacity  # When the 'count' reaches buffer_capacity, it will be reset to 0.
         self.current_size = min(self.current_size + 1, self.buffer_capacity)
 
     def sample(self, total_steps):

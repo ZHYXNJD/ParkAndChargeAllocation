@@ -137,6 +137,9 @@ class DQN(object):
 
         intrinsic_rewards = self.intrinsic_scale * forward_loss.mean(-1)
         total_rewards = intrinsic_rewards.clone()
+        total_rewards = (total_rewards - min(total_rewards)) / (max(total_rewards) - min(total_rewards))
+        total_rewards = 0.003 * total_rewards
+
         if self.use_extrinsic:
             total_rewards += batch['reward']
 
@@ -184,7 +187,7 @@ class DQN(object):
         if self.use_lr_decay:  # learning rate Decay
             self.lr_decay(total_steps)
 
-        return loss, Q_loss.item(), forward_loss.mean().item(), inverse_pred_loss.mean().item(), intrinsic_rewards.mean().item()
+        return loss, Q_loss.item(), forward_loss.mean().item(), inverse_pred_loss.mean().item(), intrinsic_rewards.mean().item(),total_rewards
 
     def lr_decay(self, total_steps):
         lr_now = 0.9 * self.lr * (1 - total_steps / self.max_train_steps) + 0.1 * self.lr
