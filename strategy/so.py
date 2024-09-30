@@ -290,16 +290,25 @@ if __name__ == '__main__':
 
     REVENUE_total = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 0目标函数 1总收益 2停车收益 3充电收益 4拒绝总数 5停车拒绝数 6充电拒绝数 7出行时间 8巡游时间
 
-    for i in [200]:
-        park_arrival_num = i
-        # 需求信息
-        req_info = pd.read_csv(f"G:\\2023-纵向\\停车分配\\需求分布\\demand0607\\{park_arrival_num}-{charge_ratio}.csv")
-        req_info['revenue'] = [(np.floor(req_info['activity_t'].iloc[i] / 15) * park_fee + (
+    # for i in [200]:
+        # park_arrival_num = i
+        # # 需求信息
+        # req_info = pd.read_csv(f"G:\\2023-纵向\\停车分配\\需求分布\\demand0607\\{park_arrival_num}-{charge_ratio}.csv")
+        # req_info['revenue'] = [(np.floor(req_info['activity_t'].iloc[i] / 15) * park_fee + (
+        #         req_info['activity_t'].iloc[i] * (charge_fee[req_info['new_label'].iloc[i]])) + reserved_fee) for i in
+        #                        range(len(req_info))]
+        # K = max(req_info['leave_t'])  # 时间长度
+        #
+        # for j in range(1, 6):
+        #     so(rule=j)
+        #     print(f"park_num:{i},rule:{j}")
+
+    park_arrival_num = 400
+    req_info = pd.read_csv(f"G:\\2023-纵向\\停车分配\\需求分布\\demand0607\\400-0.25.csv")
+    req_info['revenue'] = [(np.floor(req_info['activity_t'].iloc[i] / 15) * park_fee + (
                 req_info['activity_t'].iloc[i] * (charge_fee[req_info['new_label'].iloc[i]])) + reserved_fee) for i in
                                range(len(req_info))]
-        K = max(req_info['leave_t'])  # 时间长度
+    K = max(req_info['leave_t'])  # 时间长度
+    so(rule=2)
 
-        for j in range(1, 6):
-            so(rule=j)
-            print(f"park_num:{i},rule:{j}")
 

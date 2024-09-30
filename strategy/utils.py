@@ -9,7 +9,7 @@ import numpy as np
 
 from entity import parkinglot
 
-pl1, pl2, pl3, pl4 = parkinglot.get_parking_lot(parking_lot_num=4)
+pl1, pl2, pl3, pl4 = parkinglot.get_parking_lot(parking_lot_num=4,config='1:1')
 pl = [pl1, pl2, pl3, pl4]
 
 
@@ -120,14 +120,22 @@ def cruise_t(z, snk, index, arrival_t):
     return 4.467 * np.power(occ_rate, 18.86)
 
 
-def save_episode_results(data_frame,supply,args):
+def pl_occ(z, snk, index, arrival_t):
+    occ_rate = np.sum(snk[index, arrival_t], axis=0) / pl[z].total_num
+    return occ_rate
 
+
+def pl_occ_diff(pl_occ_arr):
+    return np.sqrt(sum((pl_occ_arr - pl_occ_arr.mean())**2) / len(pl_occ_arr))
+
+
+def save_episode_results(data_frame, supply, args):
     folder_name = str(datetime.now().strftime("%m-%d-%H-%M"))
     save_path = '../save_data_reinforce/' + folder_name
     os.makedirs(save_path)
     # 打开文件进行写入
     config = json.dumps(vars(args))
-    with open(save_path+'/configs.txt','w') as f:
+    with open(save_path + '/configs.txt', 'w') as f:
         f.write(config)
         f.write('\n')
     data_frame.to_csv(save_path + '/episode_results.csv')
