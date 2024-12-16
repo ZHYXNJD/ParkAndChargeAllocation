@@ -68,9 +68,12 @@ class Runner:
             if args.use_n_steps:
                 self.algorithm += "_N_steps"
 
-        self.writer = SummaryWriter(log_dir='../save_data_reinforce/save_DQN/runs/{}_number_{}_seed_{}'.format(self.algorithm, number, seed))
+        self.writer = SummaryWriter(
+            log_dir='../save_data_reinforce/save_DQN/runs/{}_number_{}_seed_{}'.format(self.algorithm, number, seed))
 
-        with open('../save_data_reinforce/save_DQN/configs/{}_number_{}_seed{}.txt'.format(self.algorithm, number, seed), 'w') as f:
+        with open(
+                '../save_data_reinforce/save_DQN/configs/{}_number_{}_seed{}.txt'.format(self.algorithm, number, seed),
+                'w') as f:
             write_args(f, args)
 
         self.total_steps = 0  # Record the total steps during the training
@@ -82,25 +85,29 @@ class Runner:
             self.epsilon_min = self.args.epsilon_min
             self.epsilon_decay = (self.args.epsilon_init - self.args.epsilon_min) / self.args.epsilon_decay_steps
 
-    def save_data(self,number,seed,episode_data,train_loss):
+    def save_data(self, number, seed, episode_data, train_loss):
 
         try:
-            os.makedirs('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}'.format(number,seed))
+            os.makedirs('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}'.format(number, seed))
         except:
             pass
         pd.DataFrame(columns={'step', 'loss'}, data=train_loss).to_csv(
-                '../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/train_loss.csv'.format(number, seed))
+            '../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/train_loss.csv'.format(number, seed))
 
-        column_name = ['episode', 'acc rewards', 'total rev', 'park rev', 'char rev', 'park refuse', 'char refuse','travel cost', 'cruise cost']
-        pd.DataFrame(columns=column_name,data=episode_data).to_csv('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/episode_data.csv'.format(number,seed))
+        column_name = ['episode', 'acc rewards', 'total rev', 'park rev', 'char rev', 'park refuse', 'char refuse',
+                       'travel cost', 'cruise cost']
+        pd.DataFrame(columns=column_name, data=episode_data).to_csv(
+            '../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/episode_data.csv'.format(number, seed))
         # pd.DataFrame(columns={'step','reward'},data=step_reward).to_csv('../save_data_reinforce/save_DQN/data_train/number_{}_seed_{}/step_reward.csv'.format(number,seed))
 
-    def save_episode_assign_data(self,number,seed,episode_number,assign_info):
+    def save_episode_assign_data(self, number, seed, episode_number, assign_info):
         try:
-            os.makedirs('../save_data_reinforce/save_DQN/data_episode/number_{}_seed_{}'.format(number,seed))
+            os.makedirs('../save_data_reinforce/save_DQN/data_episode/number_{}_seed_{}'.format(number, seed))
         except:
             pass
-        pd.DataFrame(columns={'t','req_id','req_info','pl_num'},data=assign_info).to_csv('../save_data_reinforce/save_DQN/data_episode/number_{}_seed_{}/episode_{}_assign.csv'.format(number,seed,episode_number))
+        pd.DataFrame(columns={'t', 'req_id', 'req_info', 'pl_num'}, data=assign_info).to_csv(
+            '../save_data_reinforce/save_DQN/data_episode/number_{}_seed_{}/episode_{}_assign.csv'.format(number, seed,
+                                                                                                          episode_number))
 
     def evaluate(self):
         state_norm = Normalization(shape=args.state_dim)  # Trick 2:state normalization
@@ -144,13 +151,20 @@ class Runner:
                 else:
                     countother += 1
 
-                if not done:
-                    if args.use_state_norm:
-                        next_state = state_norm(next_state)
-                    if args.use_reward_norm:
-                        reward = reward_norm(reward)
-                    elif args.use_reward_scaling:
-                        reward = reward_scaling(reward)
+                # if not done:
+                #     if args.use_state_norm:
+                #         next_state = state_norm(next_state)
+                #     if args.use_reward_norm:
+                #         reward = reward_norm(reward)
+                #     elif args.use_reward_scaling:
+                #         reward = reward_scaling(reward)
+
+                if args.use_state_norm:
+                    next_state = state_norm(next_state)
+                if args.use_reward_norm:
+                    reward = reward_norm(reward)
+                elif args.use_reward_scaling:
+                    reward = reward_scaling(reward)
 
                 train_reward += reward
                 self.total_steps += 1
@@ -164,7 +178,8 @@ class Runner:
             print("episode{},count0:{},count other:{}".format(episode_steps + 1, count0, countother))
 
             episode_steps += 1
-            self.save_episode_assign_data(number=self.number, seed=self.seed, episode_number=episode_steps,assign_info=assign_info)
+            self.save_episode_assign_data(number=self.number, seed=self.seed, episode_number=episode_steps,
+                                          assign_info=assign_info)
 
             print(f"episode: {episode_steps}, episode reward: {train_reward}")
             print(
@@ -199,7 +214,6 @@ class Runner:
 
             done = False
             train_reward = 0
-            total_reward = 0
             assign_info = []
 
             """
@@ -223,13 +237,12 @@ class Runner:
                 else:
                     countother += 1
 
-                if not done:
-                    if args.use_state_norm:
-                        next_state = state_norm(next_state)
-                    if args.use_reward_norm:
-                        reward = reward_norm(reward)
-                    elif args.use_reward_scaling:
-                        reward = reward_scaling(reward)
+                if args.use_state_norm:
+                    next_state = state_norm(next_state)
+                if args.use_reward_norm:
+                    reward = reward_norm(reward)
+                elif args.use_reward_scaling:
+                    reward = reward_scaling(reward)
 
                 train_reward += reward
                 self.total_steps += 1
@@ -246,17 +259,17 @@ class Runner:
 
                 if self.replay_buffer.current_size >= self.args.batch_size:
                     if args.use_icm:
-                        loss, Q_loss_record, forward_loss_record, inverse_pred_loss_record, intrinsic_rewards_rec,total_rewards = \
+                        loss, Q_loss_record, forward_loss_record, inverse_pred_loss_record, intrinsic_rewards_rec = \
                             self.agent.learn_icm(self.replay_buffer, self.total_steps)
 
                         if self.total_steps % 500 == 0:
                             print(
-                                "train_step: %5d,total_loss: %4f, forward_loss: %4f, inverse_pred_loss: %4f, Q_loss: %4f, intrinsic_rewards: %4f,total_rewards:%4f" %
+                                "train_step: %5d,total_loss: %4f, forward_loss: %4f, inverse_pred_loss: %4f, Q_loss: %4f, intrinsic_rewards: %4f" %
                                 (self.total_steps, loss, forward_loss_record, inverse_pred_loss_record,
-                                 Q_loss_record, intrinsic_rewards_rec,total_rewards))
+                                 Q_loss_record, intrinsic_rewards_rec))
                     else:
                         loss = self.agent.learn(self.replay_buffer, self.total_steps)
-                        train_loss.append([self.total_steps,loss])
+                        train_loss.append([self.total_steps, loss])
                         if self.total_steps % 500 == 0:
                             print("train_step: %5d, Q_loss: %4f" % (self.total_steps, loss))
                 # step reward
@@ -265,13 +278,14 @@ class Runner:
                 # step loss
                 self.writer.add_scalar('step_loss', loss, global_step=self.total_steps)
 
-            print("episode{},count0:{},count other:{}".format(episode_steps+1,count0,countother))
+            print("episode{},count0:{},count other:{}".format(episode_steps + 1, count0, countother))
 
             episode_steps += 1
             self.writer.add_scalar('episode_reward', train_reward, global_step=episode_steps)
             # if episode_steps % 10 == 0:
             if episode_steps % 10 == 0:
-                self.save_episode_assign_data(number=self.number,seed=self.seed,episode_number=episode_steps,assign_info=assign_info)
+                self.save_episode_assign_data(number=self.number, seed=self.seed, episode_number=episode_steps,
+                                              assign_info=assign_info)
 
             print(f"episode: {episode_steps},  extrinsic reward: {train_reward}")
             print(
@@ -280,29 +294,30 @@ class Runner:
             print("\n")
 
             episode_result.append([episode_steps, self.env.accumulative_rewards, self.env.total_revenue,
-                                                     self.env.park_revenue, self.env.char_revenue, self.env.park_refuse,
-                                                     self.env.char_refuse, self.env.travel_cost, self.env.cruise_cost])
+                                   self.env.park_revenue, self.env.char_revenue, self.env.park_refuse,
+                                   self.env.char_refuse, self.env.travel_cost, self.env.cruise_cost])
 
-        self.save_data(number=self.number,seed=self.seed,episode_data=episode_result,train_loss=train_loss)
+        self.save_data(number=self.number, seed=self.seed, episode_data=episode_result, train_loss=train_loss)
 
         #  save model
-        torch.save(self.agent.net.state_dict(),f'../save_data_reinforce/save_DQN/model/number_{self.number}_seed_{self.seed}_net.pth')
+        torch.save(self.agent.net.state_dict(),
+                   f'../save_data_reinforce/save_DQN/model/number_{self.number}_seed_{self.seed}_net.pth')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting for save_DQN")
 
-    parser.add_argument("--park_arrival_num", type=int, default=400, help="park arrival number")
-    parser.add_argument("--charge_ratio", type=float, default=0.25, help="charge ratio")
+    parser.add_argument("--park_arrival_num", type=int, default=300, help="park arrival number")
+    parser.add_argument("--charge_ratio", type=float, default=1, help="charge ratio")
     parser.add_argument("--rule", type=int, default=2, help="match rule")
 
     parser.add_argument("--objective:max revenue", type=int, default=0)
-    parser.add_argument("--acc", type=int, default=1)
-    parser.add_argument("--r_with_no_d", type=int, default=1)
-    parser.add_argument("--r_p_no_avail", type=int, default=-3)
+    parser.add_argument("--acc", type=int, default=0.1)
+    parser.add_argument("--r_with_no_d", type=int, default=0)
+    parser.add_argument("--r_p_no_avail", type=int, default=-1)
     parser.add_argument("--r_c_no_avail", type=int, default=-3)
 
-    parser.add_argument("--max_train_steps", type=int, default=2000 * 400, help=" Maximum number of training steps")
+    parser.add_argument("--max_train_steps", type=int, default=500 * 600, help=" Maximum number of training steps")
     parser.add_argument("--max_evaluate_steps", type=int, default=10 * 1600, help=" Maximum number of evaluate steps")
     parser.add_argument("--evaluate_freq", type=float, default=1e3,
                         help="Evaluate the policy every 'evaluate_freq' steps")
@@ -312,29 +327,30 @@ if __name__ == '__main__':
     parser.add_argument("--use_reward_norm", type=bool, default=False, help="Trick 3:reward normalization")
     parser.add_argument("--use_reward_scaling", type=bool, default=True, help="Trick 4:reward scaling")
 
-    parser.add_argument("--buffer_capacity", type=int, default=int(10000), help="The maximum replay-buffer capacity  1E5")
+    parser.add_argument("--buffer_capacity", type=int, default=int(100000),
+                        help="The maximum replay-buffer capacity  1E5")
     # parser.add_argument("--batch_size", type=int, default=256, help="batch size")
-    parser.add_argument("--batch_size", type=int, default=1024, help="batch size 512")
+    parser.add_argument("--batch_size", type=int, default=512, help="batch size 512")
     parser.add_argument("--hidden_dim", type=int, default=256,
                         help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
-    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--epsilon_init", type=float, default=0.1, help="Initial epsilon")
-    parser.add_argument("--epsilon_min", type=float, default=0.05, help="Minimum epsilon")
+    parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate of actor")
+    parser.add_argument("--gamma", type=float, default=0.9, help="Discount factor")
+    parser.add_argument("--epsilon_init", type=float, default=0.3, help="Initial epsilon")
+    parser.add_argument("--epsilon_min", type=float, default=0.1, help="Minimum epsilon")
     parser.add_argument("--epsilon_decay_steps", type=int, default=int(1e5),
                         help="How many steps before the epsilon decays to the minimum")
     parser.add_argument("--tau", type=float, default=0.005, help="soft update the target network")
     parser.add_argument("--use_soft_update", type=bool, default=True, help="Whether to use soft update")
     parser.add_argument("--target_update_freq", type=int, default=100,
                         help="Update frequency of the target network(hard update)")
-    parser.add_argument("--n_steps", type=int, default=15, help="n_steps")
+    parser.add_argument("--n_steps", type=int, default=10, help="n_steps")
     parser.add_argument("--alpha", type=float, default=0.6, help="PER parameter")
     parser.add_argument("--beta_init", type=float, default=0.4, help="Important sampling parameter in PER")
     parser.add_argument("--use_lr_decay", type=bool, default=True, help="Learning rate Decay")
     parser.add_argument("--grad_clip", type=float, default=10.0, help="Gradient clip")
 
     parser.add_argument("--use_double", type=bool, default=True, help="Whether to use double Q-learning")
-    parser.add_argument("--use_dueling", type=bool, default=True, help="Whether to use dueling network")
+    parser.add_argument("--use_dueling", type=bool, default=False, help="Whether to use dueling network")
     parser.add_argument("--use_noisy", type=bool, default=True, help="Whether to use noisy network")
     parser.add_argument("--use_per", type=bool, default=True, help="Whether to use PER")
     parser.add_argument("--use_n_steps", type=bool, default=True, help="Whether to use n_steps Q-learning")
@@ -352,7 +368,7 @@ if __name__ == '__main__':
     # for seed in [0, 10, 100]:
     #     runner = Runner(args=args,number=1, seed=seed)
     #     runner.run()
-    runner = Runner(args=args, number=12, seed=1024)
+    runner = Runner(args=args, number=36, seed=100)
     runner.run()
 
     # print("------------------------评估结果---------------------------")

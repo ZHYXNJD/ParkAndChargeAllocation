@@ -78,7 +78,6 @@ class DQN(object):
 
     def learn(self, replay_buffer, total_steps):
         batch, batch_index, IS_weight = replay_buffer.sample(total_steps)
-
         with torch.no_grad():  # q_target has no gradient
             if self.use_double:  # Whether to use the 'double q-learning'
                 # Use online_net to select the action
@@ -91,8 +90,11 @@ class DQN(object):
                 q_target = batch['reward'] + self.gamma * (1 - batch['done']) * self.target_net(
                     batch['next_state']).gather(-1, a_argmax).squeeze(-1)  # shape：(batch_size,)
             else:
-                q_target = batch['reward'] + self.gamma * (1 - batch['done']) * \
-                           self.target_net(batch['next_state']).max(dim=-1)[0]  # shape：(batch_size,)
+                next_q_values = self.target_net(batch['next_state'])  # (batch_size, action_dim)
+                next_q_values = next_q_values + (batch['next_invalid_action'] - 1) * 1e6
+                max_next_q_values = next_q_values.max(dim=-1)[0]  # (batch_size,)
+
+                q_target = batch['reward'] + self.gamma * (1 - batch['done']) * max_next_q_values # shape：(batch_size,)
 
         q_current = self.net(batch['state']).gather(-1, batch['action']).squeeze(-1)  # shape：(batch_size,)
         td_errors = q_current - q_target  # shape：(batch_size,)

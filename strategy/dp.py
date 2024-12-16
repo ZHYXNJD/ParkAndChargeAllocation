@@ -196,6 +196,7 @@ def dp(rule, alpha1=1, alpha2=1, alpha3=1, alpha4=5):
         REVENUE_total[ith + 1][5] = refuse_park.getValue()  # 停车拒绝数
         REVENUE_total[ith + 1][6] = refuse_char.getValue()  # 充电拒绝数
         REVENUE_total[ith + 1][7] = obj2_.getValue()  # 行程时间
+        REVENUE_total[ith + 1][8] = i  # 决策间隔
         # REVENUE_total[ith + 1][8] = obj4.getValue()  # 巡游时间
 
         for n in range(N):
@@ -333,7 +334,7 @@ if __name__ == '__main__':
         I = request_interval  # 迭代次数  （需求个数）
         S_NK = np.zeros((len(I) + 1, N, K)).astype(int)  # 供给状态 每轮迭代更新
         X_NM_total = []  # 每轮分配结果
-        REVENUE_total = [[0, 0, 0, 0, 0, 0, 0, 0] for _ in range(len(I) + 1)]  # i时段 目标函数，停车/充电收益，拒绝数量，步行时间；
+        REVENUE_total = [[0, 0, 0, 0, 0, 0, 0, 0,0] for _ in range(len(I) + 1)]  # i时段 目标函数，停车/充电收益，拒绝数量，步行时间；
 
         # for j in range(1,6):
         #     dp(rule=j)

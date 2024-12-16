@@ -8,7 +8,7 @@ import argparse
 from normalization import Normalization, RewardScaling
 from replaybuffer import ReplayBuffer
 from ppo_discrete import PPO_discrete
-from DQN import nnew_env
+from DQN import env_0817
 # from new_env import Env
 import warnings
 
@@ -35,8 +35,8 @@ def save_data(number, seed, episode_data, train_loss, step_reward):
                    'travel cost', 'cruise cost']
     pd.DataFrame(columns=column_name, data=episode_data).to_csv(
         '../save_data_reinforce/save_ppo/data_train/number_{}_seed_{}/episode_data.csv'.format(number, seed))
-    pd.DataFrame(columns={'step', 'reward'}, data=step_reward).to_csv(
-        '../save_data_reinforce/save_ppo/data_train/number_{}_seed_{}/step_reward.csv'.format(number, seed))
+    # pd.DataFrame(columns={'step', 'reward'}, data=step_reward).to_csv(
+    #     '../save_data_reinforce/save_ppo/data_train/number_{}_seed_{}/step_reward.csv'.format(number, seed))
 
 
 def save_episode_assign_data(number, seed, episode_number, assign_info):
@@ -49,29 +49,14 @@ def save_episode_assign_data(number, seed, episode_number, assign_info):
                                                                                                       episode_number))
 
 
-def evaluate_policy(args, env, agent, state_norm):
-    s = env.reset()
-    invalid_choice = env.get_invalid_action()
-    if args.use_state_norm:  # During the evaluating,update=False
-        s = state_norm(s, update=False)
-    done = False
-    result_list = []
-    while not done:
-        a = agent.evaluate(s, invalid_choice)  # We use the deterministic policy during the evaluating
-        s_, r, done, result_list = env.step(a)
-        invalid_choice = env.get_invalid_action()
-        if args.use_state_norm:
-            s_ = state_norm(s_, update=False)
-        s = s_
-
-    return env.accumulative_rewards, result_list
-
-
 def main(args, number,seed):
-    env = nnew_env.Env(park_arrival_num=args.park_arrival_num, charge_ratio=args.charge_ratio, rule=args.rule)
+    env = env_0817.Env(park_arrival_num=args.park_arrival_num, charge_ratio=args.charge_ratio, rule=args.rule)
 
     args.state_dim = env.observation_space
     args.action_dim = env.action_space
+    env.acc = args.acc
+    env.r_c_no_avail = args.r_c_no_avail
+    env.r_p_no_avail = args.r_p_no_avail
     print("park_num={}".format(args.park_arrival_num))
     print("charge_ratio={}".format(args.charge_ratio))
     print("match_rule={}".format(args.rule))
@@ -79,7 +64,6 @@ def main(args, number,seed):
     print("action_dim={}".format(args.action_dim))
 
     total_steps = 0  # Record the total steps during the training
-
 
     replay_buffer = ReplayBuffer(args)
     agent = PPO_discrete(args)
@@ -120,17 +104,17 @@ def main(args, number,seed):
 
             # assign information
             if (episode_steps + 1) % 10 == 0:
-                assign_info.append([env.t, env.req_id_at_t, env.request_demand, a])
+                assign_info.append([env.t, env.req_id_at_t, env.req_t, a])
 
             s_, r, done = env.step(a)
             next_mask = env.get_invalid_action()
-            if not done:
-                if args.use_state_norm:
-                    s_ = state_norm(s_)
-                if args.use_reward_norm:
-                    r = reward_norm(r)
-                elif args.use_reward_scaling:
-                    r = reward_scaling(r)
+
+            if args.use_state_norm:
+                s_ = state_norm(s_)
+            if args.use_reward_norm:
+                r = reward_norm(r)
+            elif args.use_reward_scaling:
+                r = reward_scaling(r)
 
             train_reward += r
             total_steps += 1
@@ -149,6 +133,8 @@ def main(args, number,seed):
                 writer.add_scalar('critic_loss', cri_loss, global_step=episode_steps)
                 writer.add_scalar('dist_entropy', entropy, global_step=episode_steps)
                 train_loss.append([total_steps, cri_loss])
+
+
         episode_steps += 1
         writer.add_scalar('episode_reward', train_reward, global_step=episode_steps)
 
@@ -177,25 +163,25 @@ def main(args, number,seed):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting for PPO-discrete")
 
-    parser.add_argument("--park_arrival_num", type=int, default=400, help="park arrival number")
-    parser.add_argument("--charge_ratio", type=float, default=0.25, help="charge ratio")
+    parser.add_argument("--park_arrival_num", type=int, default=225, help="park arrival number")
+    parser.add_argument("--charge_ratio", type=float, default=1, help="charge ratio")
     parser.add_argument("--rule", type=int, default=2, help="match rule")
 
     parser.add_argument("--objective:max revenue", type=int, default=0)
     parser.add_argument("--acc", type=int, default=1)
     parser.add_argument("--r_with_no_d", type=int, default=1)
-    parser.add_argument("--r_p_no_avail", type=int, default=-1)
-    parser.add_argument("--r_c_no_avail", type=int, default=-3)
+    parser.add_argument("--r_p_no_avail", type=int, default=-5)
+    parser.add_argument("--r_c_no_avail", type=int, default=-10)
 
-    parser.add_argument("--max_train_steps", type=int, default=80 * 2000, help=" Maximum number of training steps")
+    parser.add_argument("--max_train_steps", type=int, default=2000 * 500, help=" Maximum number of training steps")
     # parser.add_argument("--evaluate_freq", type=int, default=100, help="Evaluate the policy every 'evaluate_freq' steps")
     parser.add_argument("--save_freq", type=int, default=5, help="Save frequency")
-    parser.add_argument("--batch_size", type=int, default=1500, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=64, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=512, help="Minibatch size")
     parser.add_argument("--hidden_width", type=int, default=256,
                         help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--lr_a", type=float, default=5e-5, help="Learning rate of actor")
-    parser.add_argument("--lr_c", type=float, default=5e-5, help="Learning rate of critic")
+    parser.add_argument("--lr_a", type=float, default=1e-5, help="Learning rate of actor")
+    parser.add_argument("--lr_c", type=float, default=1e-5, help="Learning rate of critic")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.95, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
@@ -215,4 +201,4 @@ if __name__ == '__main__':
 
     # env_name = 'Assign'
 
-    main(args, number=3,seed=1024)
+    main(args, number=9,seed=100)

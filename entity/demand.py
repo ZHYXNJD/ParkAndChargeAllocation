@@ -53,7 +53,7 @@ def sum_to_total(init_arrival, total_arrival):
 
 class Demand:
 
-    def __init__(self, park_arrival_num, charge_ratio):
+    def __init__(self, park_arrival_num, charge_num):
         self.fast_std = 25
         self.fast_mean = 45
         self.slow_std = 280
@@ -67,7 +67,7 @@ class Demand:
         self.el_std = 140
         self.el_mean = 1250
         self.park_num = park_arrival_num
-        self.charge_num = self.park_num * charge_ratio
+        self.charge_num = charge_num
 
     def set_short_params(self, mean, std):
         self.s_mean = mean
@@ -182,7 +182,7 @@ class Demand:
             if i == 0:
                 arrival_times_hours.extend(np.sort(np.random.uniform(0, 1, charge_arrival_per_hour[i])))
             elif i == 1:
-                arrival_times_hours.extend(np.sort(np.random.uniform(1,10, charge_arrival_per_hour[i])))
+                arrival_times_hours.extend(np.sort(np.random.uniform(1, 10, charge_arrival_per_hour[i])))
             elif i == 2:
                 arrival_times_hours.extend(np.sort(np.random.uniform(10, 11, charge_arrival_per_hour[i])))
             elif i == 3:
@@ -252,7 +252,7 @@ def assign_new_label(row):
         return 2
 
 
-def all_info(park_num, charge_ratio, O, D, park_info, charge_info):
+def all_info(park_num, charge_num, O, D, park_info, charge_info):
     # park_info: request time, arrival time, park time
     # charge_info: request time, arrival time,charge time
 
@@ -260,7 +260,7 @@ def all_info(park_num, charge_ratio, O, D, park_info, charge_info):
         columns=['request_t', 'arrival_t', 'activity_t', 'leave_t', 'label', 'O', 'D', 'new_label', 'revenue',
                  'req_id'])
     label = [0] * park_num
-    charge_label = [1] * int(park_num * charge_ratio)
+    charge_label = [1] * int(charge_num)
     label.extend(charge_label)
     park_info[0].extend(charge_info[0])
     park_info[1].extend(charge_info[1])
@@ -281,15 +281,17 @@ def all_info(park_num, charge_ratio, O, D, park_info, charge_info):
     return all_
 
 
-def main(park_arrival_num, charge_ratio,plot=False,train=False):
+def main(park_arrival_num, charge_number, plot=False, train=False):
     if not train:
         # 确保可以复现
         # 评估的时候打开随机种子  训练的时候关闭掉
-        np.random.seed(1000)
+        # np.random.seed(1000)
+        np.random.seed(43)
+        # np.random.seed(521)
 
     origin_num = OD.OdCost().O
     destination_num = OD.OdCost().D
-    demand = Demand(park_arrival_num, charge_ratio)
+    demand = Demand(park_arrival_num, charge_number)
     p_arr = demand.park_arrival_dis()
     c_arr = demand.charge_arrival_dis()
     p_t = demand.park_duration_dis(p_arr)
@@ -297,20 +299,23 @@ def main(park_arrival_num, charge_ratio,plot=False,train=False):
     p_r, c_r = request_time_dis(p_arr, c_arr)
 
     if plot:
-        test_plot(p_arr,c_arr,p_t,c_t)
+        test_plot(p_arr, c_arr, p_t, c_t)
         return 0
     # 训练的时候关闭
     if not train:
-        demand_data = all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t],
+        demand_data = all_info(park_arrival_num, charge_number, origin_num, destination_num, [p_r, p_arr, p_t],
                                [c_r, c_arr, c_t])
 
-        demand_data.to_csv(fr"G:\2023-纵向\停车分配\需求分布\demand0607\{park_arrival_num}-{charge_ratio}.csv")
+        # demand_data.to_csv(fr"G:\2023-纵向\停车分配\需求分布\demand1125\{park_arrival_num}-{charge_ratio}.csv")
+        demand_data.to_csv(fr"G:\2023-纵向\停车分配\需求分布\demand1125\{park_arrival_num}-{charge_number}-0.csv")
     # 训练的时候打开
     else:
-        return all_info(park_arrival_num, charge_ratio, origin_num, destination_num, [p_r, p_arr, p_t], [c_r, c_arr, c_t])
+        return all_info(park_arrival_num, charge_number, origin_num, destination_num, [p_r, p_arr, p_t],
+                        [c_r, c_arr, c_t])
 
 
 if __name__ == '__main__':
-    for i in [100,150,200]:
-        main(i,0.25)
-    # main(park_arrival_num=300,charge_ratio=1,plot=False)
+    # for each in [120,240,360,480]:
+    #     main(park_arrival_num=each, charge_number=600-each)
+    main(park_arrival_num=300, charge_number=300)
+    # main(park_arrival_num=500,charge_ratio=1,plot=False)

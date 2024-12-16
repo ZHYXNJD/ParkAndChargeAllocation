@@ -9,7 +9,8 @@ pl1, pl2, pl3, pl4 = parkinglot.get_parking_lot()
 pl = [pl1, pl2, pl3, pl4]
 pl_num = len(pl)
 
-O, D, pl, cost_matrix = OD.OdCost().get_od_info()
+O, D, pl = OD.OdCost().get_od_info()
+cost_matrix = OD.OdCost().cost_matrix
 
 ordinary_num = [pl1.ordinary_num, pl2.ordinary_num, pl3.ordinary_num, pl4.ordinary_num]
 fast_charge_num = [pl1.fast_charge_space, pl2.fast_charge_space, pl3.fast_charge_space, pl4.fast_charge_space, ]
@@ -29,7 +30,7 @@ def get_revenue(req_info):
 def get_train_req(park_arrival_num, charge_ratio):
     # 更新需求
     # req_info = demand.main(park_arrival_num, charge_ratio, train=True)
-    req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand0607\80-0.25.csv")
+    req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand0607\{}-{}.csv".format(park_arrival_num,charge_ratio))
     return get_revenue(req_info)
 
 
@@ -69,9 +70,9 @@ def match_action(x, y):
 def get_so_assign(park_arrival_num, charge_ratio):
     # 更新需求
     # req_info = demand.main(park_arrival_num, charge_ratio, train=True)
-    req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand0607\400-0.25.csv")
-    so_assign = pd.read_csv(r'G:\2023-纵向\停车分配\save_data\需求41供给11\400-0.25\assign_info\so_2.csv')
-    so_assign = pd.merge(so_assign, req_info[['req_id','request_t', 'arrival_t', 'new_label']], on='req_id',
+    req_info = pd.read_csv(r"G:\2023-纵向\停车分配\需求分布\demand0607\300-1.csv")
+    so_assign = pd.read_csv(r'G:\2023-纵向\停车分配\save_data_0923\需求11供给11\300-1\assign_info\so_2.csv')
+    so_assign = pd.merge(so_assign, req_info[['req_id', 'request_t', 'arrival_t', 'new_label']], on='req_id',
                          how='right')
     so_assign['opt_action'] = so_assign[['pl_num', 'new_label']].apply(lambda x: match_action(x.iloc[0], x.iloc[1]),
                                                                        axis=1)
@@ -155,6 +156,7 @@ class ParkingLotManagement:
 
 class Env:
     def __init__(self, evaluate=False, park_arrival_num=100, charge_ratio=1, rule=1):
+        self.req_id_li = []
         self.action_space = 14
         self.supply_t = []
         self.accumulative_rewards = None
@@ -164,7 +166,7 @@ class Env:
         self.park_arrival_num = park_arrival_num
         self.charge_ratio = charge_ratio
         self._max_episode_steps = None
-        self.observation_space = 377
+        self.observation_space = 347
         self.episode = 1440
         self.cruise_cost = None
         self.total_revenue = None
@@ -200,8 +202,8 @@ class Env:
         # 状态空间定义为供给和需求
         self.pl_current_supply = self.current_supply()  # 当前时刻空闲资源数量 4*3
         self.pl_future_supply = self.future_supply()  # 未来一段时间内释放的的资源数量 4*45 （相当于给到占用时长或离开时间）
-        self.future_o_demand = self.future_demand()[0]  # 未来一段时间到达o的数量 2*45
-        self.future_d_demand = self.future_demand()[1]  # 未来一段时间到达d的数量 2*45
+        # self.future_o_demand = self.future_demand()[0]  # 未来一段时间到达o的数量 2*45
+        # self.future_d_demand = self.future_demand()[1]  # 未来一段时间到达d的数量 2*45
 
         self.total_demand_at_t = self.get_request_demand()  # t时间的总需求
         self.ith_demand_at_t = 0  # t时刻给出的第i个需求
@@ -209,11 +211,15 @@ class Env:
                               :-1]  # 三部分：1.需求类型 2.OD 3. 活动时长 1*4  # 最后一个不传 是id
         self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
 
+        # self.states = np.concatenate(
+        #     (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
+        #      self.future_o_demand.flatten(), self.future_d_demand.flatten(), self.request_demand.flatten()))
+
         self.states = np.concatenate(
             (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
-             self.future_o_demand.flatten(), self.future_d_demand.flatten(), self.request_demand.flatten()))
+             self.new_future_demand().flatten(), self.request_demand.flatten()))
+
         self.action_space = 14  # 动作空间维度 设计为14个 (1-3:1号停车场停车快充和慢充，4-6：2号停车场，7-9：3号停车场，10-12：4号停车场，13：无需求时返回 0：拒绝时返回)
-        self._max_episode_steps = 1440
         self.t = 0  # 开始时刻为0时刻
         self.rewards = 0  # 奖励函数
 
@@ -238,22 +244,39 @@ class Env:
         return np.array([self.plm[i].future_available_supply_t(self.t, self.t_next) for i in range(pl_num)]).reshape(4,
                                                                                                                      -1)
 
-    def future_demand(self):
-        future_o = np.zeros((3, O, self.t_next)).astype(int)  # 估计未来15min内
-        future_d = np.zeros((3, D, self.t_next)).astype(int)  # 估计未来15min内
+    # def future_demand(self):
+    #    future_o = np.zeros((3, O, self.t_next)).astype(int)  # 估计未来15min内
+    #    future_d = np.zeros((3, D, self.t_next)).astype(int)  # 估计未来15min内
+    #
+    #    temp_index = self.req_info[
+    #        (self.req_info['arrival_t'] >= self.t) & (self.req_info['arrival_t'] < self.t + self.t_next) & (
+    #                self.req_info['request_t'] <= self.t)].index.tolist()
+    #    for each_arrival in temp_index:
+    #        temp_o = self.req_info['O'].loc[each_arrival]
+    #        temp_d = self.req_info['D'].loc[each_arrival]
+    #        temp_t = self.req_info['arrival_t'].loc[each_arrival] - self.t
+    #        temp_label = self.req_info['new_label'].loc[each_arrival]
+    #        future_o[temp_label][temp_o][temp_t] += 1
+    #        future_d[temp_label][temp_d][temp_t] += 1
 
-        temp_index = self.req_info[
-            (self.req_info['arrival_t'] >= self.t) & (self.req_info['arrival_t'] < self.t + self.t_next) & (
-                    self.req_info['request_t'] <= self.t)].index.tolist()
-        for each_arrival in temp_index:
-            temp_o = self.req_info['O'].loc[each_arrival]
-            temp_d = self.req_info['D'].loc[each_arrival]
-            temp_t = self.req_info['arrival_t'].loc[each_arrival] - self.t
-            temp_label = self.req_info['new_label'].loc[each_arrival]
-            future_o[temp_label][temp_o][temp_t] += 1
-            future_d[temp_label][temp_d][temp_t] += 1
+    #    return [future_o, future_d]
 
-        return [future_o, future_d]
+    # 未来15min内的请求【到达时间 请求类型 活动时长 od】 30 * 5
+    def new_future_demand(self):
+        temp_df = self.req_info[['arrival_t', 'new_label', 'activity_t', 'O', 'D']].loc[
+            (self.req_info['arrival_t'] > self.t) & (self.req_info['arrival_t'] <= self.t + self.t_next) & (
+                        self.req_info['req_id'] != self.req_id_at_t)]
+        temp_value = temp_df.values
+        f_d = np.concatenate([temp_value, np.zeros((30 - len(temp_value), 5))], axis=0)
+        return f_d
+
+    def new_future_demand_same_t(self,req_id_li):
+        temp_df = self.req_info[['arrival_t', 'new_label', 'activity_t', 'O', 'D']].loc[
+            (self.req_info['arrival_t'] >= self.t) & (self.req_info['arrival_t'] <= self.t + self.t_next) & (
+                    self.req_info['req_id'].any() not in req_id_li)]
+        temp_value = temp_df.values
+        f_d = np.concatenate([temp_value, np.zeros((30 - len(temp_value), 5))], axis=0)
+        return f_d
 
     # 停车或充电需求，包括需求种类，起终点编号（独热编码），活动时长
     def get_request_demand(self):
@@ -342,6 +365,7 @@ class Env:
     # 选一个停车场后更新相关信息
     def step(self, action):
         if self.t < self.episode:
+            self.req_id_li.append(self.req_id_at_t)
             if 0 < action < 13:  # 有分配泊位
                 this_demand = self.request_demand
                 this_revenue = self.req_info['revenue'].loc[self.req_id_at_t]
@@ -362,8 +386,8 @@ class Env:
 
                 self.pl_current_supply = self.current_supply()  # 当前时刻空闲资源数量 4*3
                 self.pl_future_supply = self.future_supply()  # 未来一段时间内释放的的资源数量 4*45 （相当于给到占用时长或离开时间）
-                self.future_o_demand = self.future_demand()[0]  # 未来一段时间到达o的数量 2*45
-                self.future_d_demand = self.future_demand()[1]  # 未来一段时间到达d的数量 2*45
+                # self.future_o_demand = self.future_demand()[0]  # 未来一段时间到达o的数量 2*45
+                # self.future_d_demand = self.future_demand()[1]  # 未来一段时间到达d的数量 2*45
 
                 self.total_revenue += this_revenue
                 self.cruise_cost += self.plm[int((action - 1) // 3)].cruising_t
@@ -375,16 +399,27 @@ class Env:
                 # self.rewards = self.reward_shaping_function(action)
 
                 if self.ith_demand_at_t == len(self.total_demand_at_t):
+
                     self.t += 1
                     self.ith_demand_at_t = 0
                     self.total_demand_at_t = self.get_request_demand()
+                    self.req_id_li = []
 
-                self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
-                self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
+                    self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
+                    self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
 
-                self.states = np.concatenate(
-                    (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
-                     self.future_o_demand.flatten(), self.future_d_demand.flatten(), self.request_demand.flatten()))
+                    self.states = np.concatenate(
+                        (
+                        np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
+                        self.new_future_demand().flatten(), self.request_demand.flatten()))
+
+                else:
+                    self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
+                    self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
+                    self.states = np.concatenate(
+                        (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
+                         self.new_future_demand_same_t(req_id_li=self.req_id_li).flatten(), self.request_demand.flatten()))
+
 
                 if req_type == 0:
                     self.park_revenue += this_revenue
@@ -401,8 +436,8 @@ class Env:
 
                 self.pl_current_supply = self.current_supply()  # 当前时刻空闲资源数量 4*3
                 self.pl_future_supply = self.future_supply()  # 未来一段时间内释放的的资源数量 4*45 （相当于给到占用时长或离开时间）
-                self.future_o_demand = self.future_demand()[0]  # 未来一段时间到达o的数量 2*45
-                self.future_d_demand = self.future_demand()[1]  # 未来一段时间到达d的数量 2*45
+                # self.future_o_demand = self.future_demand()[0]  # 未来一段时间到达o的数量 2*45
+                # self.future_d_demand = self.future_demand()[1]  # 未来一段时间到达d的数量 2*45
 
                 # self.rewards = self.reward_shaping_function(action)
 
@@ -429,17 +464,40 @@ class Env:
                         # self.rewards = -self.req_info['revenue_std'].loc[self.req_id_at_t]
                         self.rewards = self.reward_shaping_function(action)
 
+                # if self.ith_demand_at_t == len(self.total_demand_at_t):
+                #     self.t += 1
+                #     self.ith_demand_at_t = 0
+                #     self.total_demand_at_t = self.get_request_demand()
+                #
+                # self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
+                # self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
+                #
+                # self.states = np.concatenate(
+                #     (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
+                #      self.future_o_demand.flatten(), self.future_d_demand.flatten(), self.request_demand.flatten()))
+
                 if self.ith_demand_at_t == len(self.total_demand_at_t):
+
                     self.t += 1
                     self.ith_demand_at_t = 0
                     self.total_demand_at_t = self.get_request_demand()
+                    self.req_id_li = []
 
-                self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
-                self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
+                    self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
+                    self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
 
-                self.states = np.concatenate(
-                    (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
-                     self.future_o_demand.flatten(), self.future_d_demand.flatten(), self.request_demand.flatten()))
+                    self.states = np.concatenate(
+                        (
+                        np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
+                        self.new_future_demand().flatten(), self.request_demand.flatten()))
+
+                else:
+                    self.request_demand = self.total_demand_at_t[self.ith_demand_at_t, :-1]
+                    self.req_id_at_t = self.total_demand_at_t[self.ith_demand_at_t, -1]
+                    self.states = np.concatenate(
+                        (np.array([self.t]).flatten(), self.pl_current_supply.flatten(), self.pl_future_supply.flatten(),
+                         self.new_future_demand_same_t(req_id_li=self.req_id_li).flatten(), self.request_demand.flatten()))
+
 
             self.supply_t.append(self.pl_current_supply)
             self.accumulative_rewards += self.rewards

@@ -80,7 +80,6 @@ class Arrival:
                            0.12,
                            0.07,
                            0.05
-
                            ]
         self.charge_ratio = [0.08,
                              0.07,

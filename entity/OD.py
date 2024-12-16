@@ -29,4 +29,11 @@ class OdCost:
                                      [5, 3, 5, 10]])
 
     def get_od_info(self):
-        return self.O, self.D, self.pl, self.cost_matrix
+        return self.O, self.D, self.pl
+
+    """
+    标准化cost_matrix
+    """
+    def get_std_cost(self):
+        std_cost = (self.cost_matrix - self.cost_matrix.min()) / (self.cost_matrix.max()-self.cost_matrix.min())
+        return std_cost
